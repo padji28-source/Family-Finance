@@ -1,0 +1,6 @@
+{
+  "name": "Family Finance Sync",
+  "description": "A secure and easy-to-use family financial tracking app with categorized expenses, monthly reporting, and cross-device synchronization.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}

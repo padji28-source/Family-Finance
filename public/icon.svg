@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#2563eb" />
+  <path d="M256 128 C185 128 128 185 128 256 C128 327 185 384 256 384 C327 384 384 327 384 256 C384 185 327 128 256 128 Z" fill="#ffffff" />
+  <path d="M256 160 C203 160 160 203 160 256 C160 309 203 352 256 352 C309 352 352 309 352 256 C352 203 309 160 256 160 Z" fill="#2563eb" />
+  <text x="256" y="295" font-family="sans-serif" font-size="120" font-weight="bold" fill="#ffffff" text-anchor="middle">FF</text>
+</svg>

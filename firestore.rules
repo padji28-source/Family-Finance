@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'familyId', 'createdAt']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.email is string && data.email.size() <= 100 &&
+        (data.familyId == null || (data.familyId is string && data.familyId.size() <= 128)) &&
+        data.createdAt is timestamp;
+    }
+    
+    function isValidFamily(data) {
+      return data.keys().hasAll(['name', 'ownerId', 'memberIds', 'createdAt']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.ownerId is string && data.ownerId == request.auth.uid &&
+        data.memberIds is list && data.memberIds.size() >= 1 && data.memberIds.size() <= 50 && data.memberIds[0] is string &&
+        data.createdAt is timestamp;
+    }
+    
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['type', 'amount', 'category', 'date', 'description', 'addedBy', 'createdAt', 'updatedAt']) &&
+        data.type is string && data.type in ['income', 'expense'] &&
+        data.amount is number &&
+        data.category is string && data.category.size() > 0 && data.category.size() <= 50 &&
+        data.date is timestamp &&
+        data.description is string && data.description.size() <= 500 &&
+        data.addedBy is string && data.addedBy == request.auth.uid &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+    
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if false;
+      allow create: if isSignedIn() && isValidId(userId) && request.auth.uid == userId &&
+        isValidUser(incoming()) && incoming().createdAt == request.time;
+      allow update: if isSignedIn() && isValidId(userId) && request.auth.uid == userId &&
+        isValidUser(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'familyId']);
+    }
+    
+    match /families/{familyId} {
+      allow get: if isSignedIn() && isValidId(familyId) && request.auth.uid in existing().memberIds;
+      allow list: if isSignedIn() && request.auth.uid in resource.data.memberIds;
+      
+      allow create: if isSignedIn() && isValidId(familyId) && 
+        isValidFamily(incoming()) && 
+        incoming().memberIds.hasAll([request.auth.uid]) &&
+        incoming().createdAt == request.time;
+        
+      allow update: if isSignedIn() && isValidId(familyId) && request.auth.uid in existing().memberIds &&
+        isValidFamily(incoming()) &&
+        existing().ownerId == incoming().ownerId &&
+        existing().createdAt == incoming().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'memberIds']);
+    }
+    
+    match /families/{familyId}/transactions/{transactionId} {
+      function isFamilyMember() {
+        return request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.memberIds;
+      }
+      
+      allow get: if isSignedIn() && isValidId(familyId) && isValidId(transactionId) && isFamilyMember();
+      allow list: if isSignedIn() && isValidId(familyId) && isFamilyMember();
+      
+      allow create: if isSignedIn() && isValidId(familyId) && isValidId(transactionId) && isFamilyMember() &&
+        isValidTransaction(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+        
+      allow update: if isSignedIn() && isValidId(familyId) && isValidId(transactionId) && isFamilyMember() &&
+        isValidTransaction(incoming()) &&
+        existing().addedBy == incoming().addedBy &&
+        existing().createdAt == incoming().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['type', 'amount', 'category', 'date', 'description', 'updatedAt']);
+        
+      allow delete: if isSignedIn() && isValidId(familyId) && isValidId(transactionId) && isFamilyMember();
+    }
+  }
+}
